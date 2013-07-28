@@ -14,6 +14,8 @@ You'll also need an API key from here [ http://code.google.com/apis/language/tra
     # => 'hola'
     google.translate(:en, :es, '<p>hi</p>', :html => true)
     # => '<p> hola </p>'
+    google.get_supported_languages
+    # => ['pt']
 
 
 Contributing to google_fish

@@ -1,15 +1,24 @@
 class GoogleFish
-  attr_accessor :key, :source, :target, :q, :translated_text, :format
+  attr_accessor :key, :source, :target, :q, :translated_text, :format, :supported_languages
 
   def initialize(key)
     @key = key
-    @format = :text
   end
 
   def translate(source, target, q, options={})
-    @format = :html if options[:html]
+    @format = options[:html] ? :html : :text
     @source, @target, @q = source, target, q
     @translated_text = request_translation
+  end
+
+  def get_supported_languages(target = nil)
+    @source = @format = @q = nil
+    @target = target
+    @supported_languages = request_supported_languages
+  end
+
+  def supported_languages
+    @supported_languages ||= get_supported_languages
   end
 
   private
@@ -17,6 +26,11 @@ class GoogleFish
   def request_translation
     api = GoogleFish::Request.new(self)
     api.perform_translation
+  end
+
+  def request_supported_languages
+    api = GoogleFish::Request.new(self)
+    api.get_supported_languages
   end
 end
 
@@ -35,6 +49,11 @@ class GoogleFish::Request
     @parsed_response = parse
   end
 
+  def get_supported_languages
+    @response = get('languages')
+    @parsed_response = parse_languages
+  end
+
   private
 
   def query_values
@@ -42,17 +61,19 @@ class GoogleFish::Request
       :source => query.source, :target => query.target}
   end
 
-  def uri
+  def set_uri(action = '')
     uri = Addressable::URI.new
     uri.host = 'www.googleapis.com'
-    uri.path = '/language/translate/v2'
-    uri.query_values = query_values
+    (action = action =~ /^\// ? action : '/' + action) unless action.empty?
+    uri.path = '/language/translate/v2' + action
+    uri.query_values = query_values.delete_if{ |k, v| v.nil? }
     uri.scheme = 'https'
     uri.port = 443
     uri
   end
 
-  def get
+  def get(action = '')
+    uri = set_uri(action)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
     http.verify_mode = OpenSSL::SSL::VERIFY_NONE
@@ -65,6 +86,11 @@ class GoogleFish::Request
   def parse
     body = JSON.parse(response)
     body["data"]["translations"].first["translatedText"]
+  end
+
+  def parse_languages
+    body = JSON.parse(response)
+    body["data"]["languages"].collect{ |l| l["language"] }
   end
 end
 
